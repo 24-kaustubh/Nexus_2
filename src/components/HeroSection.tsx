@@ -1,39 +1,25 @@
 import { motion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 import HexagonLogo from "./HexagonLogo";
 import { Button } from "./ui/button";
 
 const HeroSection = () => {
+  const navigate = useNavigate();
+
+  const handleCheckOutSIA = () => {
+    navigate("/auth");
+  };
+
   return (
     <section id="about" className="min-h-screen flex flex-col items-center justify-center px-6 py-10">
-      {/* Logo */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true }}
-        transition={{ duration: 0.8 }}
-        className="mb-14" // Increased margin-bottom to create a larger gap from the text
-      >
-        <div style={{ position: "relative", right: "76.7%" }}>
-          <HexagonLogo size="sm" />
-        </div>
-      </motion.div>
-
-      {/* Title */}
-      <motion.h2
-        initial={{ opacity: 0, y: 20 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true }}
-        transition={{ duration: 0.8, delay: 0.2 }}
-        className="font-display text-6xl md:text-6xl font-bold tracking-ultra-wide text-foreground mt-9 mb-11"
-      >
-        NEXUS
-      </motion.h2>
+      
       {/* Subtitle */}
       <motion.p
         initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8, delay: 0.6 }}
-        className="font-display text-xl md:text-xl lg:text-xl font-semibold tracking-widest uppercase text-foreground mb-12"
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        transition={{ duration: 0.8, delay: 0.4 }}
+        className="font-display text-sm sm:text-lg md:text-xl font-semibold tracking-widest uppercase text-foreground mb-8 sm:mb-12 text-center w-full"
       >
         Intelligence, made natural.
       </motion.p>
@@ -41,9 +27,10 @@ const HeroSection = () => {
       {/* Description */}
       <motion.p
         initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8, delay: 0.8 }}
-        className="font-body text-base md:text-lg text-foreground/80 text-center max-w-3xl mb-16 leading-relaxed"
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        transition={{ duration: 0.8, delay: 0.6 }}
+        className="font-body text-sm sm:text-base md:text-lg text-foreground/80 text-center max-w-2xl sm:max-w-3xl mb-8 sm:mb-12 md:mb-16 leading-relaxed px-2 sm:px-0 w-full"
       >
         Check out SIA — Super Intelligent Assistant, our first flagship software product. 
         SIA makes AI feel more human, bridging the gap between people and intelligence 
@@ -53,10 +40,12 @@ const HeroSection = () => {
       {/* CTA Button */}
       <motion.div
         initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.8, delay: 1 }}
+        whileInView={{ opacity: 1, scale: 1 }}
+        viewport={{ once: true }}
+        transition={{ duration: 0.8, delay: 0.8 }}
+        className="w-full flex justify-center"
       >
-        <Button variant="hero" size="hero">
+        <Button variant="hero" size="hero" onClick={handleCheckOutSIA}>
           CHECK OUT S.I.A.
         </Button>
       </motion.div>

@@ -100,13 +100,11 @@
 
   .hexagon-logo {
     position: relative;
-  left: "7.9%";
   }
 
   .hexagon-logo::before {
     content: '';
-    position: relative;
-    left: "7.9%";
+    position: absolute;
     inset: -4px;
     background: transparent;
     border: 2px solid hsl(var(--foreground) / 0.3);
@@ -137,11 +135,11 @@
   }
 
   .ornamental-divider::before {
-    left: 175%;
+    left: 45%;
   }
 
   .ornamental-divider::after {
-    right: 175%;
+    right: 45%;
   }
 
   .section-divider {
