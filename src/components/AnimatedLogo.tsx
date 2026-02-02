@@ -1,156 +1,101 @@
 import { motion } from "framer-motion";
 
 interface AnimatedLogoProps {
-  size?: "sm" | "md" | "lg" | "xl";
-  className?: string;
   isActive?: boolean;
   isListening?: boolean;
   isSpeaking?: boolean;
+  size?: "sm" | "md" | "lg" | "xl";
+  className?: string;
 }
 
 const sizeClasses = {
-  sm: "w-20 h-24",
-  md: "w-40 h-48",
-  lg: "w-64 h-80",
-  xl: "w-80 h-96",
+  sm: "w-24 h-24",
+  md: "w-40 h-40",
+  lg: "w-60 h-60",
+  xl: "w-72 h-72",
 };
 
-const HexagonLogo = ({
-  size = "md",
-  className = "",
+const AnimatedLogo = ({
   isActive = false,
   isListening = false,
   isSpeaking = false,
+  size = "lg",
+  className = ""
 }: AnimatedLogoProps) => {
   
-  const currentState = isSpeaking 
-    ? "speaking" 
-    : isListening 
-      ? "listening" 
-      : isActive 
-        ? "active" 
-        : "idle";
-
-  const outerVariants = {
-    idle: { 
-      strokeOpacity: 0.3, 
-      strokeWidth: 60, 
-      filter: "none" 
-    },
-    active: { 
-      strokeOpacity: 0.8, 
-      strokeWidth: 60, 
-      filter: "url(#glow)" 
-    },
-    listening: {
-      strokeOpacity: [0.6, 1, 0.6],
-      strokeWidth: [60, 65, 60],
-      filter: "url(#glow)",
-      transition: {
-        duration: 3,
-        repeat: Infinity,
-        ease: "easeInOut"
-      }
-    },
-    speaking: {
-      strokeOpacity: 1,
-      strokeWidth: [60, 90, 60],
-      filter: "url(#glow)",
-      transition: {
-        duration: 0.4,
-        repeat: Infinity,
-        ease: "easeInOut"
-      }
-    }
-  };
-
-  const innerVariants = {
-    idle: { 
-      strokeOpacity: 0.3, 
-      strokeWidth: 32, 
-      filter: "none" 
-    },
-    active: { 
-      strokeOpacity: 0.8, 
-      strokeWidth: 32, 
-      filter: "url(#glow)" 
-    },
-    listening: {
-      strokeOpacity: [0.6, 1, 0.6],
-      strokeWidth: [32, 38, 32],
-      filter: "url(#glow)",
-      transition: {
-        duration: 3,
-        repeat: Infinity,
-        ease: "easeInOut",
-        delay: 0.2
-      }
-    },
-    speaking: {
-      strokeOpacity: 1,
-      strokeWidth: [32, 55, 32],
-      filter: "url(#glow)",
-      transition: {
-        duration: 0.4,
-        repeat: Infinity,
-        ease: "easeInOut",
-        delay: 0.1
-      }
-    }
-  };
+  // Static Flat-Top Hexagon points with padding to prevent clipping
+  const outerPoints = "30,12 70,12 92,50 70,88 30,88 8,50";
+  const innerPoints = "35,24 65,24 81,50 65,76 35,76 19,50";
 
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.8 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.8, ease: "easeOut" }}
-      className={`relative flex items-center justify-center ${sizeClasses[size]} ${className}`}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.8 }}
+      className={`${sizeClasses[size]} ${className} flex items-center justify-center`}
     >
       <svg
-        viewBox="-200 -200 2000 2000"
-        width="100%"
-        height="100%"
+        viewBox="0 0 100 100"
+        className="w-full h-full overflow-visible"
+        fill="none"
         xmlns="http://www.w3.org/2000/svg"
-        preserveAspectRatio="xMidYMid meet"
       >
         <defs>
-          <filter id="glow" x="-100%" y="-100%" width="300%" height="300%">
-            <feGaussianBlur stdDeviation="35" result="coloredBlur" />
-            <feMerge>
-              <feMergeNode in="coloredBlur" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
+          {/* subtleGlow: used for the Outer Hexagon while listening */}
+          <filter id="subtleGlow" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="1.2" result="blur" />
+            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+          </filter>
+
+          {/* intenseGlow: used for both hexagons while speaking */}
+          <filter id="intenseGlow" x="-30%" y="-30%" width="160%" height="160%">
+            <feGaussianBlur stdDeviation="2.8" result="blur" />
+            <feComposite in="SourceGraphic" in2="blur" operator="over" />
           </filter>
         </defs>
 
-        <rect x="-200" y="-200" width="2000" height="2000" fill="black" />
-        
-        <g
-          transform="translate(0, 0)"
+        {/* Outer Hexagon - Pointy Corners, No Movement */}
+        <motion.polygon
+          points={outerPoints}
           stroke="white"
-          fill="none"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          {/* Outer Hexagon */}
-          <motion.path
-            d="M 400 232 L 1200 232 L 1568 920 L 1200 1608 L 400 1608 L 32 920 Z"
-            variants={outerVariants}
-            initial="idle"
-            animate={currentState}
-          />
-
-          {/* Inner Hexagon */}
-          <motion.path
-            d="M 480 430 L 1120 430 L 1380 920 L 1120 1410 L 480 1410 L 220 920 Z"
-            variants={innerVariants}
-            initial="idle"
-            animate={currentState}
-          />
-        </g>
+          strokeWidth="3.5"
+          strokeLinejoin="miter" // Sharp corners
+          animate={{
+            // Switches to intenseGlow when speaking, subtleGlow when listening
+            filter: isSpeaking 
+              ? "url(#intenseGlow)" 
+              : isListening 
+              ? "url(#subtleGlow)" 
+              : "none",
+            opacity: (isListening || isSpeaking) ? [1, 0.8, 1] : 1
+          }}
+          transition={{
+            duration: 2.5,
+            repeat: Infinity,
+            ease: "easeInOut"
+          }}
+        />
+        
+        {/* Inner Hexagon - Pointy Corners, No Movement */}
+        <motion.polygon
+          points={innerPoints}
+          stroke="white"
+          strokeWidth="2.5"
+          strokeLinejoin="miter" // Sharp corners
+          animate={{
+            // Only glows (intensely) when speaking
+            filter: isSpeaking ? "url(#intenseGlow)" : "none",
+            opacity: isSpeaking ? [0.6, 1, 0.6] : 1
+          }}
+          transition={{
+            duration: 1.8,
+            repeat: Infinity,
+            ease: "easeInOut"
+          }}
+        />
       </svg>
     </motion.div>
   );
 };
 
-export default HexagonLogo;
+export default AnimatedLogo;

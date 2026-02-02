@@ -101,7 +101,7 @@ const Auth = () => {
       >
         <div className="flex flex-col items-center mb-8">
   <HexagonLogo size="lg" className="mb-11 -ml-10" />
-          <h1 className="font-display text-3xl font-bold tracking-wide text-foreground mb-2">
+          <h1 className="font-display text-2xl font-bold tracking-wide text-foreground mb-2">
             {isLogin ? "Welcome Back" : "Create Account"}
           </h1>
           <p className="text-muted-foreground text-center">

@@ -9,6 +9,7 @@ import { MessageSquare } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/hooks/use-auth';
 
+
 interface VoiceMessage {
   id: string;
   text: string;
@@ -388,12 +389,15 @@ const SIA = () => {
           className="flex flex-col items-center"
         >
           {/* Animated Logo */}
-          <AnimatedLogo
-            isActive={isSpeaking}
-            isListening={!isSpeaking}
-            isSpeaking={isSpeaking}
-            size="xl"
-          />
+                    {/* Animated Logo */}
+<AnimatedLogo 
+  size="xl" 
+  isListening={!isSpeaking}
+  isSpeaking={isSpeaking}
+  isActive={connected}
+/>
+
+
 
           {/* Status Text */}
           <motion.p
