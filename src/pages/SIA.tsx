@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
 import AnimatedLogo from '@/components/AnimatedLogo';
 import ProfileButton from '@/components/ProfileButton';
 import ChatHistory from '@/components/ChatHistory';
@@ -8,6 +7,8 @@ import { Button } from '@/components/ui/button';
 import { MessageSquare } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/hooks/use-auth';
+import { wsUrl, isProductionBackend } from '@/lib/api-config';
+import { connectSignalR, sendSignalRMessage, disconnectSignalR } from '@/lib/api';
 
 
 interface VoiceMessage {
@@ -27,37 +28,109 @@ const SIA = () => {
   const [error, setError] = useState<string | null>(null);
   
   const wsRef = useRef<WebSocket | null>(null);
+  const signalrUserIdRef = useRef<string>('');
+  const useSignalRRef = useRef(false);
+  const cleanupRef = useRef<(() => void) | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
   const silenceIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isListeningRef = useRef(false);
 
-  // Initialize WebSocket and start listening
+  const playBase64Audio = (base64Content: string, onEnded: () => void) => {
+    try {
+      const binaryString = atob(base64Content);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      const blob = new Blob([bytes], { type: 'audio/wav' });
+      const audioUrl = URL.createObjectURL(blob);
+      const audio = new Audio(audioUrl);
+      audio.onended = onEnded;
+      audio.play().catch(() => onEnded());
+    } catch (e) {
+      console.error('Audio play error:', e);
+      onEnded();
+    }
+  };
+
+  // Initialize connection: SignalR for production (HTTPS), WebSocket for local
   useEffect(() => {
+    cleanupRef.current = null;
+
     const initVoiceAssistant = async () => {
+      if (isProductionBackend()) {
+        useSignalRRef.current = true;
+        try {
+          signalrUserIdRef.current = await connectSignalR(
+            {
+              onTranscript: (text) => {
+                setMessages(prev => [...prev, {
+                  id: `transcript-${Date.now()}`,
+                  text,
+                  type: 'transcript',
+                  timestamp: new Date(),
+                }]);
+              },
+              onAudio: (base64Chunk) => {
+                setMessages(prev => [...prev, {
+                  id: `assistant-${Date.now()}`,
+                  text: 'Speaking...',
+                  type: 'assistant',
+                  timestamp: new Date(),
+                }]);
+                playBase64Audio(base64Chunk, () => {
+                  setIsSpeaking(false);
+                  setTimeout(() => {
+                    isListeningRef.current = false;
+                    startListening();
+                  }, 500);
+                });
+              },
+              onComplete: () => {
+                setIsSpeaking(false);
+                setTimeout(() => {
+                  isListeningRef.current = false;
+                  startListening();
+                }, 1000);
+              },
+            },
+            (err) => {
+              console.error('SignalR error:', err);
+              setConnected(false);
+              setError('Connection failed');
+            }
+          );
+          setConnected(true);
+          setError(null);
+          startListening();
+        } catch (err) {
+          console.error('SignalR connect failed:', err);
+          setError('Connection failed');
+          setConnected(false);
+        }
+        cleanupRef.current = () => {
+          disconnectSignalR();
+        };
+        return;
+      }
+
+      useSignalRRef.current = false;
       try {
-        const userId = user?.id || 'anonymous';
-        
-        // Initialize WebSocket
-        const wsUrl = `ws://localhost:8000/api/v1/ws/voice/${userId}`;
-        wsRef.current = new WebSocket(wsUrl);
+        wsRef.current = new WebSocket(wsUrl());
 
         wsRef.current.onopen = () => {
           console.log('✅ Connected to Sia voice');
           setConnected(true);
           setError(null);
-          // Start listening immediately
           startListening();
         };
 
         wsRef.current.onmessage = async (event) => {
           try {
             const data = JSON.parse(event.data);
-            console.log('📨 Voice response:', data);
-
             if (data.type === 'transcript') {
-              console.log('📝 User said:', data.content);
               setMessages(prev => [...prev, {
                 id: `transcript-${Date.now()}`,
                 text: data.content,
@@ -65,46 +138,21 @@ const SIA = () => {
                 timestamp: new Date(),
               }]);
             } else if (data.type === 'audio') {
-              try {
-                console.log('🔊 Playing audio response');
-                const audioData = data.content;
-                const binaryString = atob(audioData);
-                const bytes = new Uint8Array(binaryString.length);
-                for (let i = 0; i < binaryString.length; i++) {
-                  bytes[i] = binaryString.charCodeAt(i);
-                }
-                const blob = new Blob([bytes], { type: 'audio/mpeg' });
-                const audioUrl = URL.createObjectURL(blob);
-                const audio = new Audio(audioUrl);
-                
-                audio.onended = () => {
-                  console.log('✅ Audio finished, restarting listening');
-                  setIsSpeaking(false);
-                  setTimeout(() => {
-                    isListeningRef.current = false;
-                    startListening();
-                  }, 500);
-                };
-                
-                audio.play().catch(e => {
-                  console.error('Audio play error:', e);
-                  setTimeout(() => {
-                    startListening();
-                  }, 500);
-                });
-              } catch (e) {
-                console.error('Audio processing error:', e);
-              }
-
               setMessages(prev => [...prev, {
                 id: `assistant-${Date.now()}`,
                 text: data.text || 'Listening...',
                 type: 'assistant',
                 timestamp: new Date(),
               }]);
+              playBase64Audio(data.content, () => {
+                setIsSpeaking(false);
+                setTimeout(() => {
+                  isListeningRef.current = false;
+                  startListening();
+                }, 500);
+              });
               setIsSpeaking(false);
             } else if (data.type === 'text') {
-              console.log('💬 Text response:', data.content);
               setMessages(prev => [...prev, {
                 id: `assistant-${Date.now()}`,
                 text: data.content,
@@ -112,35 +160,28 @@ const SIA = () => {
                 timestamp: new Date(),
               }]);
               setIsSpeaking(false);
-              
-              // Auto-restart listening
-              setTimeout(() => {
-                console.log('🎤 Restarting listening after text response');
-                startListening();
-              }, 1000);
+              setTimeout(() => startListening(), 1000);
             } else if (data.type === 'error') {
-              console.error('❌ Backend error:', data.content);
               setError(data.content || 'Error occurred');
               setIsSpeaking(false);
-              // Restart listening after error
-              setTimeout(() => {
-                startListening();
-              }, 1000);
+              setTimeout(() => startListening(), 1000);
             }
           } catch (e) {
             console.error('Parse error:', e);
           }
         };
 
-        wsRef.current.onerror = (error) => {
-          console.error('❌ WebSocket error:', error);
+        wsRef.current.onerror = () => {
           setConnected(false);
           setError('Connection failed');
         };
 
-        wsRef.current.onclose = () => {
-          console.log('WebSocket disconnected');
-          setConnected(false);
+        wsRef.current.onclose = () => setConnected(false);
+        cleanupRef.current = () => {
+          if (wsRef.current) {
+            wsRef.current.close();
+            wsRef.current = null;
+          }
         };
       } catch (err) {
         console.error('Failed to initialize voice:', err);
@@ -154,9 +195,7 @@ const SIA = () => {
     }
 
     return () => {
-      if (wsRef.current) {
-        wsRef.current.close();
-      }
+      cleanupRef.current?.();
       stopListening();
     };
   }, [user, loading]);
@@ -242,11 +281,24 @@ const SIA = () => {
             
             const reader = new FileReader();
 
-            reader.onloadend = () => {
+            reader.onloadend = async () => {
               const base64Audio = (reader.result as string).split(',')[1];
-              console.log('📤 Sending audio to backend, base64 length:', base64Audio.length);
-              
-              if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+              console.log('📤 Sending audio to backend, base64 length:', base64Audio?.length ?? 0);
+
+              if (useSignalRRef.current && signalrUserIdRef.current) {
+                try {
+                  await sendSignalRMessage('audio', base64Audio ?? '', signalrUserIdRef.current);
+                  setIsSpeaking(true);
+                  console.log('✅ Audio sent via SignalR, waiting for response...');
+                } catch (e) {
+                  console.error('SignalR send error:', e);
+                  setError('Failed to send audio');
+                  setTimeout(() => startListening(), 1000);
+                }
+                return;
+              }
+
+              if (wsRef.current?.readyState === WebSocket.OPEN) {
                 wsRef.current.send(JSON.stringify({
                   type: 'audio',
                   content: base64Audio,
@@ -254,10 +306,8 @@ const SIA = () => {
                 setIsSpeaking(true);
                 console.log('✅ Audio sent to backend, waiting for response...');
               } else {
-                console.error('❌ WebSocket not ready, state:', wsRef.current?.readyState);
-                setTimeout(() => {
-                  startListening();
-                }, 1000);
+                console.error('❌ WebSocket not ready');
+                setTimeout(() => startListening(), 1000);
               }
             };
 
@@ -358,13 +408,18 @@ const SIA = () => {
     );
   }
 
+  if (!user) {
+    navigate("/auth", { replace: true });
+    return null;
+  }
+
   return (
     <main className="min-h-screen bg-background relative overflow-hidden">
       {/* Chat History Sidebar */}
       <ChatHistory
         isOpen={showHistory}
         onClose={() => setShowHistory(false)}
-        userId={user?.id}
+        userId={user != null ? String(user.id) : undefined}
       />
 
       {/* Header */}

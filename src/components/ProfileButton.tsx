@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { User } from "@supabase/supabase-js";
-import { supabase } from "@/integrations/supabase/client";
+import type { SiaUser } from "@/lib/sia-auth";
+import { clearAuth } from "@/lib/sia-auth";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,7 +15,7 @@ import { User as UserIcon, LogOut } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface ProfileButtonProps {
-  user: User | null;
+  user: SiaUser | null;
 }
 
 const ProfileButton = ({ user }: ProfileButtonProps) => {
@@ -23,20 +23,21 @@ const ProfileButton = ({ user }: ProfileButtonProps) => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const handleSignOut = async () => {
+  const handleSignOut = () => {
     setLoading(true);
     try {
-      await supabase.auth.signOut();
+      clearAuth();
       navigate("/");
       toast({
         title: "Signed out",
         description: "You have been successfully signed out.",
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Failed to sign out.";
       toast({
         variant: "destructive",
         title: "Error",
-        description: error.message || "Failed to sign out.",
+        description: message,
       });
     } finally {
       setLoading(false);
@@ -44,9 +45,7 @@ const ProfileButton = ({ user }: ProfileButtonProps) => {
   };
 
   const getDisplayName = () => {
-    if (user?.user_metadata?.full_name) {
-      return user.user_metadata.full_name;
-    }
+    if (user?.full_name) return user.full_name;
     return user?.email?.split("@")[0] || "User";
   };
 
@@ -66,8 +65,8 @@ const ProfileButton = ({ user }: ProfileButtonProps) => {
           {getInitial()}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent 
-        align="end" 
+      <DropdownMenuContent
+        align="end"
         className="w-64 bg-card border-border"
       >
         <DropdownMenuLabel className="font-display">
@@ -86,7 +85,7 @@ const ProfileButton = ({ user }: ProfileButtonProps) => {
           <span>Profile</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator className="bg-border" />
-        <DropdownMenuItem 
+        <DropdownMenuItem
           onClick={handleSignOut}
           disabled={loading}
           className="text-destructive focus:bg-destructive/10 focus:text-destructive"

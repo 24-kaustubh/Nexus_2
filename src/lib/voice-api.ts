@@ -1,17 +1,20 @@
 // src/lib/voice-api.ts
+// Sia Backend: single WebSocket at /api/v1/ws for text + audio (Option A).
 
-const API_BASE_URL = "http://localhost:8000";
+import { wsUrl } from "@/lib/api-config"; // or relative path
+const ws = new WebSocket(wsUrl());
+
 
 let voiceWs: WebSocket | null = null;
 let mediaRecorder: MediaRecorder | null = null;
 let audioContext: AudioContext | null = null;
 
-export async function initializeVoiceWebSocket(userId: string = "anonymous"): Promise<WebSocket> {
+export async function initializeVoiceWebSocket(): Promise<WebSocket> {
   return new Promise((resolve, reject) => {
     try {
-      voiceWs = new WebSocket(
-        `ws://localhost:8000/api/v1/ws/voice/${userId}`
-      );
+      const url = wsUrl();
+      console.log("🔌 Voice WS URL:", url);   // <-- ADD THIS
+      voiceWs = new WebSocket(url);
 
       voiceWs.onopen = () => {
         console.log("✅ Voice WebSocket connected");
@@ -109,7 +112,7 @@ export async function sendAudioData(audioData: Uint8Array): Promise<void> {
       JSON.stringify({
         type: "audio",
         content: base64Audio,
-      })
+      } as { type: "audio"; content: string })
     );
   } catch (error) {
     console.error("Error sending audio data:", error);

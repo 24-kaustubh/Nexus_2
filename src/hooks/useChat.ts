@@ -1,50 +1,27 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
-import { chatAPI, createWebSocketConnection } from '@/lib/api';
+import { useState, useCallback, useRef } from 'react';
+import { chatAPI, type ChatMessage } from '@/lib/api';
 
 interface Message {
   id: string;
   type: 'user' | 'bot';
   text: string;
   timestamp: Date;
+  /** Optional base64 audio from Sia (if response_format supports it) */
+  audioBase64?: string | null;
 }
 
 export const useChat = (userId: string = 'anonymous') => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const wsRef = useRef<WebSocket | null>(null);
-  const conversationIdRef = useRef<string>('');
 
-  // Initialize WebSocket
-  useEffect(() => {
-    wsRef.current = createWebSocketConnection(
-      userId,
-      (data) => {
-        const botMessage: Message = {
-          id: `bot-${Date.now()}`,
-          type: 'bot',
-          text: data.message,
-          timestamp: new Date(),
-        };
-        setMessages((prev) => [...prev, botMessage]);
-        setLoading(false);
-      },
-      (error) => {
-        console.error('WebSocket Error:', error);
-        setError('Connection error. Using HTTP fallback.');
-      }
-    );
-
-    return () => {
-      wsRef.current?.close();
-    };
-  }, [userId]);
+  /** Conversation history in Sia format for POST /api/v1/chat/ */
+  const historyRef = useRef<ChatMessage[]>([]);
 
   const sendMessage = useCallback(
     async (text: string) => {
       if (!text.trim()) return;
 
-      // Add user message
       const userMessage: Message = {
         id: `user-${Date.now()}`,
         type: 'user',
@@ -55,32 +32,28 @@ export const useChat = (userId: string = 'anonymous') => {
       setLoading(true);
       setError(null);
 
-      try {
-        // Use HTTP if WebSocket not ready, otherwise use WebSocket
-        if (wsRef.current?.readyState === WebSocket.OPEN) {
-          wsRef.current.send(
-            JSON.stringify({
-              message: text,
-              user_id: userId,
-            })
-          );
-        } else {
-          // Fallback to HTTP
-          const response = await chatAPI.sendMessage(
-            text,
-            userId,
-            conversationIdRef.current
-          );
-          conversationIdRef.current = response.conversation_id;
+      const newHistory: ChatMessage[] = [
+        ...historyRef.current,
+        { role: 'user', content: text },
+      ];
+      historyRef.current = newHistory;
 
-          const botMessage: Message = {
-            id: `bot-${Date.now()}`,
-            type: 'bot',
-            text: response.message,
-            timestamp: new Date(),
-          };
-          setMessages((prev) => [...prev, botMessage]);
-        }
+      try {
+        const response = await chatAPI.sendMessage(newHistory, 'text');
+
+        const botMessage: Message = {
+          id: `bot-${Date.now()}`,
+          type: 'bot',
+          text: response.message,
+          timestamp: new Date(),
+          audioBase64: response.audio_base64 ?? undefined,
+        };
+        setMessages((prev) => [...prev, botMessage]);
+
+        historyRef.current = [
+          ...historyRef.current,
+          { role: 'assistant', content: response.message },
+        ];
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Unknown error';
         setError(errorMessage);
@@ -89,12 +62,12 @@ export const useChat = (userId: string = 'anonymous') => {
         setLoading(false);
       }
     },
-    [userId]
+    []
   );
 
   const clearMessages = useCallback(() => {
     setMessages([]);
-    conversationIdRef.current = '';
+    historyRef.current = [];
   }, []);
 
   return {

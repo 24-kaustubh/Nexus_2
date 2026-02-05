@@ -7,7 +7,7 @@ const HeroSection = () => {
   const navigate = useNavigate();
 
   const handleCheckOutSIA = () => {
-    navigate("/auth");
+    window.location.href = "https://siaassistant.com";
   };
 
   return (

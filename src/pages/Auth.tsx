@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import HexagonLogo from "@/components/HexagonLogo";
+import { signin, signup, setAuth, getUser } from "@/lib/sia-auth";
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -18,22 +18,10 @@ const Auth = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    // Check if user is already logged in
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        if (session) {
-          navigate("/sia");
-        }
-      }
-    );
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        navigate("/sia");
-      }
-    });
-
-    return () => subscription.unsubscribe();
+    const user = getUser();
+    if (user) {
+      navigate("/dashboard");
+    }
   }, [navigate]);
 
   const handleAuth = async (e: React.FormEvent) => {
@@ -42,49 +30,29 @@ const Auth = () => {
 
     try {
       if (isLogin) {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-
-        if (error) throw error;
-
+        const res = await signin(email, password);
+        setAuth(res.access_token, res.user);
         toast({
           title: "Welcome back!",
           description: "You have successfully signed in.",
         });
-        
-        // Navigate to SIA after successful sign in
-        navigate("/sia");
+        navigate("/dashboard");
       } else {
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: {
-              full_name: fullName,
-            },
-          },
-        });
-
-        if (error) throw error;
-
+        await signup(email, password, fullName || null);
+        const res = await signin(email, password);
+        setAuth(res.access_token, res.user);
         toast({
           title: "Account created!",
-          description: "Check your email to verify your account, then sign in.",
+          description: "You have been signed in.",
         });
-        
-        // Clear form and switch to login mode
-        setEmail("");
-        setPassword("");
-        setFullName("");
-        setIsLogin(true);
+        navigate("/dashboard");
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "An error occurred during authentication.";
       toast({
         variant: "destructive",
         title: "Error",
-        description: error.message || "An error occurred during authentication.",
+        description: message,
       });
     } finally {
       setLoading(false);
@@ -100,13 +68,13 @@ const Auth = () => {
         className="w-full max-w-md"
       >
         <div className="flex flex-col items-center mb-8">
-  <HexagonLogo size="lg" className="mb-11 -ml-10" />
+          <HexagonLogo size="lg" className="mb-11 -ml-10" />
           <h1 className="font-display text-2xl font-bold tracking-wide text-foreground mb-2">
             {isLogin ? "Welcome Back" : "Create Account"}
           </h1>
           <p className="text-muted-foreground text-center">
-            {isLogin 
-              ? "Sign in to access S.I.A." 
+            {isLogin
+              ? "Sign in to access S.I.A."
               : "Join Nexus and experience S.I.A."}
           </p>
         </div>
@@ -122,11 +90,10 @@ const Auth = () => {
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 className="bg-secondary border-border text-foreground placeholder:text-muted-foreground"
-                required={!isLogin}
               />
             </div>
           )}
-          
+
           <div className="space-y-2">
             <Label htmlFor="email" className="text-foreground">Email</Label>
             <Input
@@ -145,12 +112,12 @@ const Auth = () => {
             <Input
               id="password"
               type="password"
-              placeholder="Enter your password"
+              placeholder="Enter your password (min 8 characters)"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="bg-secondary border-border text-foreground placeholder:text-muted-foreground"
               required
-              minLength={6}
+              minLength={8}
             />
           </div>
 
@@ -171,8 +138,8 @@ const Auth = () => {
             onClick={() => setIsLogin(!isLogin)}
             className="text-muted-foreground hover:text-foreground transition-colors"
           >
-            {isLogin 
-              ? "Don't have an account? Sign up" 
+            {isLogin
+              ? "Don't have an account? Sign up"
               : "Already have an account? Sign in"}
           </button>
         </div>
