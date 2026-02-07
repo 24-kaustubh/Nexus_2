@@ -31,8 +31,8 @@ const ChatHistory = ({ isOpen, onClose, userId }: ChatHistoryProps) => {
   }, [isOpen, userId]);
 
   const fetchSessions = async () => {
-    if (!userId) return;
-    
+    if (!userId || !supabase) return;
+
     setLoading(true);
     try {
       const { data, error } = await supabase
@@ -51,7 +51,7 @@ const ChatHistory = ({ isOpen, onClose, userId }: ChatHistoryProps) => {
   };
 
   const createNewSession = async () => {
-    if (!userId) return;
+    if (!userId || !supabase) return;
 
     try {
       const { data, error } = await supabase
@@ -64,7 +64,7 @@ const ChatHistory = ({ isOpen, onClose, userId }: ChatHistoryProps) => {
         .single();
 
       if (error) throw error;
-      
+
       setSessions([data, ...sessions]);
       toast({
         title: "New chat created",
@@ -80,6 +80,7 @@ const ChatHistory = ({ isOpen, onClose, userId }: ChatHistoryProps) => {
   };
 
   const deleteSession = async (sessionId: string) => {
+    if (!supabase) return;
     try {
       const { error } = await supabase
         .from("chat_sessions")
@@ -87,7 +88,7 @@ const ChatHistory = ({ isOpen, onClose, userId }: ChatHistoryProps) => {
         .eq("id", sessionId);
 
       if (error) throw error;
-      
+
       setSessions(sessions.filter(s => s.id !== sessionId));
       toast({
         title: "Chat deleted",
