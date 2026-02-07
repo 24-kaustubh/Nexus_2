@@ -20,7 +20,7 @@ const Auth = () => {
   useEffect(() => {
     const user = getUser();
     if (user) {
-      navigate("/dashboard");
+      navigate("https://www.siaassistant.com/sia");
     }
   }, [navigate]);
 

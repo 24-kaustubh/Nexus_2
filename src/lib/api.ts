@@ -1,3 +1,4 @@
+// src/lib/api.ts
 import { API_BASE_URL, SIGNALR_MESSAGE_URL, SIGNALR_NEGOTIATE_URL } from "./api-config";
 import { getAuthHeaders } from "./sia-auth";
 
@@ -39,33 +40,26 @@ function parseBackendError(text: string, status: number): string {
       message?: string;
     };
 
-    // Common FastAPI-style: { detail: "..." } or { detail: [{ msg: "..." }, ...] }
-    if (typeof err.detail === "string") return err.detail;
+    if (typeof err.detail === "string" && err.detail.trim()) return err.detail;
 
     if (Array.isArray(err.detail)) {
       const msgs = err.detail
-        .map((d) => (typeof (d as any)?.msg === "string" ? (d as any).msg : ""))
+        .map((d: any) => (typeof d?.msg === "string" ? d.msg : ""))
         .filter(Boolean);
       if (msgs.length) return msgs.join(", ");
     }
 
-    // Some APIs use { message: "..." }
     if (typeof err.message === "string" && err.message.trim()) return err.message;
 
     return text;
   } catch {
-    return text; // not JSON
+    return text;
   }
 }
 
 // --- REST Chat (POST /api/v1/chat/) ---
 
 export const chatAPI = {
-  /**
-   * Send chat request to Sia backend.
-   * Request: { messages: [{ role, content }], response_format }.
-   * Response: { message, audio_base64? }.
-   */
   async sendMessage(messages: ChatMessage[], responseFormat: string = "text"): Promise<ChatResponse> {
     const res = await fetch(`${API_BASE_URL}/api/v1/chat/`, {
       method: "POST",
@@ -74,9 +68,7 @@ export const chatAPI = {
     });
 
     const text = await res.text();
-    if (!res.ok) {
-      throw new Error(parseBackendError(text, res.status));
-    }
+    if (!res.ok) throw new Error(parseBackendError(text, res.status));
 
     return JSON.parse(text) as ChatResponse;
   },
@@ -90,7 +82,7 @@ let signalrConnection: import("@microsoft/signalr").HubConnection | null = null;
 let signalrUserId = "";
 
 export interface SignalRNegotiateResponse {
-  url: string;
+  url: string; // can be backend hub URL OR Azure SignalR /client URL
   accessToken?: string;
   userId: string;
 }
@@ -98,13 +90,11 @@ export interface SignalRNegotiateResponse {
 export async function signalrNegotiate(): Promise<SignalRNegotiateResponse> {
   const res = await fetch(SIGNALR_NEGOTIATE_URL, {
     method: "POST",
-    headers: getAuthHeaders(),
+    headers: getAuthHeaders(), // include auth if your backend protects negotiate
   });
 
   const text = await res.text();
-  if (!res.ok) {
-    throw new Error(text || `Negotiate failed: ${res.status}`);
-  }
+  if (!res.ok) throw new Error(text || `Negotiate failed: ${res.status}`);
 
   // backend may return JSON or raw string
   try {
@@ -127,6 +117,25 @@ export interface SignalRHandlers {
   onComplete?: (fullText: string) => void;
 }
 
+function isAzureSignalRUrl(httpUrl: string): boolean {
+  try {
+    const u = new URL(httpUrl);
+    return /\.service\.signalr\.net$/i.test(u.hostname);
+  } catch {
+    return false;
+  }
+}
+
+function toWsUrl(httpUrl: string): string {
+  return httpUrl.replace(/^http/i, "ws");
+}
+
+/**
+ * Connect SignalR.
+ * - Always negotiates via your backend (SIGNALR_NEGOTIATE_URL).
+ * - If backend returns Azure SignalR service URL (https://*.service.signalr.net/client),
+ *   we connect directly via WebSocket + skipNegotiation to avoid CORS on /negotiate.
+ */
 export async function connectSignalR(
   handlers: SignalRHandlers,
   onError?: (err: unknown) => void
@@ -134,25 +143,38 @@ export async function connectSignalR(
   const { HubConnectionBuilder, HttpTransportType, HubConnectionState } =
     await import("@microsoft/signalr");
 
-  if (signalrConnection?.state === HubConnectionState.Connected) {
-    return signalrUserId;
-  }
+  if (signalrConnection?.state === HubConnectionState.Connected) return signalrUserId;
 
   const negotiate = await signalrNegotiate();
 
-  // SignalR URL should be HTTP(S); SignalR itself upgrades transport.
-  const url = negotiate.url || `${API_BASE_URL}/api/v1/signalr`;
+  // If negotiate.url is empty, fallback to backend hub path
+  const rawUrl = (negotiate.url || `${API_BASE_URL}/api/v1/signalr`).replace(/\/$/, "");
 
-  const builder = new HubConnectionBuilder()
-    .withUrl(url, {
-      transport: HttpTransportType.WebSockets,
-      ...(negotiate.accessToken
-        ? { accessTokenFactory: () => negotiate.accessToken! }
-        : {}),
-    })
-    .withAutomaticReconnect();
+  // Build connection differently depending on where the hub lives
+  if (isAzureSignalRUrl(rawUrl)) {
+    // ✅ Azure SignalR service: must skip negotiation in browser to avoid CORS
+    // Expect rawUrl like: https://<name>.service.signalr.net/client
+    const azureClientUrl = rawUrl.replace(/\/client\/?$/i, "/client");
+    const ws = `${toWsUrl(azureClientUrl)}/?hub=sia`; // hub name must match your server-side hub
 
-  signalrConnection = builder.build();
+    signalrConnection = new HubConnectionBuilder()
+      .withUrl(ws, {
+        transport: HttpTransportType.WebSockets,
+        skipNegotiation: true,
+        ...(negotiate.accessToken ? { accessTokenFactory: () => negotiate.accessToken! } : {}),
+      })
+      .withAutomaticReconnect()
+      .build();
+  } else {
+    // ✅ Backend-hosted hub (or backend reverse-proxy): normal SignalR startup is OK
+    signalrConnection = new HubConnectionBuilder()
+      .withUrl(rawUrl, {
+        transport: HttpTransportType.WebSockets,
+        ...(negotiate.accessToken ? { accessTokenFactory: () => negotiate.accessToken! } : {}),
+      })
+      .withAutomaticReconnect()
+      .build();
+  }
 
   signalrConnection.on("transcript", (text: string) => handlers.onTranscript?.(text));
   signalrConnection.on("audio", (base64Chunk: string) => handlers.onAudio?.(base64Chunk));
@@ -172,58 +194,30 @@ export async function connectSignalR(
   }
 }
 
-/**
- * Perfect TS-safe state mapping WITHOUT numeric compares.
- * We dynamically import HubConnectionState ONCE and cache it.
- */
-let _HubConnectionState:
-  | (typeof import("@microsoft/signalr") extends infer M
-      ? M extends { HubConnectionState: infer H }
-        ? H
-        : never
-      : never)
-  | null = null;
-
-async function ensureHubConnectionState() {
-  if (_HubConnectionState) return _HubConnectionState;
-  const mod = await import("@microsoft/signalr");
-  _HubConnectionState = mod.HubConnectionState as any;
-  return _HubConnectionState;
+export async function disconnectSignalR(): Promise<void> {
+  if (signalrConnection) {
+    await signalrConnection.stop();
+    signalrConnection = null;
+  }
+  signalrUserId = "";
 }
 
-/**
- * Synchronous-ish public API: returns last-known state if enum not loaded yet.
- * For accurate state, call `await getSignalRStateAsync()`.
- */
 export function getSignalRState(): SignalRConnectionState {
   const s = signalrConnection?.state;
-  if (!signalrConnection || s === undefined || s === null) return "disconnected";
+  if (!signalrConnection || s == null) return "disconnected";
 
-  // If we haven't loaded the enum yet, we can still be safe:
-  // if connection object exists, assume "connecting" until proven connected.
-  // (This avoids TS errors and avoids lying "connected".)
-  if (!_HubConnectionState) return "connecting";
-
-  const H = _HubConnectionState as any;
-  if (s === H.Connected) return "connected";
-  if (s === H.Connecting || s === H.Reconnecting) return "connecting";
-  return "disconnected";
-}
-
-/** Accurate async state getter (use this in UI if you want exact state). */
-export async function getSignalRStateAsync(): Promise<SignalRConnectionState> {
-  const s = signalrConnection?.state;
-  if (!signalrConnection || s === undefined || s === null) return "disconnected";
-
-  const H = (await ensureHubConnectionState()) as any;
-  if (s === H.Connected) return "connected";
-  if (s === H.Connecting || s === H.Reconnecting) return "connecting";
+  // HubConnectionState is an enum, safe to compare
+  // Import lazily isn't required here because state is already on the object.
+  // We'll map by string fallback for robustness.
+  // @microsoft/signalr sets state to: "Disconnected" | "Connecting" | "Connected" | "Reconnecting" internally.
+  const asString = String(s);
+  if (asString.includes("Connected")) return "connected";
+  if (asString.includes("Connecting") || asString.includes("Reconnecting")) return "connecting";
   return "disconnected";
 }
 
 /**
- * Send a message via SignalR (POST /api/v1/signalr/message).
- * Backend handles the message and sends responses via SignalR (transcript, audio, complete).
+ * Send a message via backend (POST /api/v1/signalr/message).
  */
 export async function sendSignalRMessage(
   type: "text" | "audio",
@@ -237,21 +231,11 @@ export async function sendSignalRMessage(
   });
 
   const text = await res.text();
-  if (!res.ok) {
-    throw new Error(text || `Send message failed: ${res.status}`);
-  }
+  if (!res.ok) throw new Error(text || `Send message failed: ${res.status}`);
 
   try {
     return JSON.parse(text) as { status: string; response?: string };
   } catch {
     return { status: "success" };
   }
-}
-
-export async function disconnectSignalR(): Promise<void> {
-  if (signalrConnection) {
-    await signalrConnection.stop();
-    signalrConnection = null;
-  }
-  signalrUserId = "";
 }
