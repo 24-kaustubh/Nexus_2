@@ -43,7 +43,7 @@ const AboutSection = () => {
         </p>
 
         <p className="font-body text-base md:text-lg text-foreground/90 leading-relaxed font-medium">
-          Founded in 2024, Nexus exists for one simple goal: make intelligence more human, 
+          Founded in 2025, Nexus exists for one simple goal: make intelligence more human, 
           and make humans more capable.
         </p>
       </motion.div>
