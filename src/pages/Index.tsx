@@ -5,13 +5,11 @@ import AboutSection from "@/components/AboutSection";
 
 const Index = () => {
   return (
-    <main className="bg-background min-h-screen overflow-x-hidden">
+    <main className="min-h-screen bg-background text-foreground">
       <Navbar />
       <HeroSection />
       <ProductSection />
       <AboutSection />
-      
-      
     </main>
   );
 };
