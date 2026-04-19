@@ -13,7 +13,16 @@ const HeroSection = () => {
   return (
     <section id="about" className="min-h-screen flex flex-col items-center justify-center px-6 py-10">
 
-      
+      {/* Logo */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.8 }}
+        whileInView={{ opacity: 1, scale: 1 }}
+        viewport={{ once: true }}
+        transition={{ duration: 0.8, delay: 0.1 }}
+        className="mb-4"
+      >
+        <HexagonLogo />
+      </motion.div>
 
       {/* NEXUS wordmark */}
       <motion.h1
@@ -58,7 +67,7 @@ const HeroSection = () => {
         transition={{ duration: 0.8, delay: 0.8 }}
         className="w-full flex justify-center"
       >
-        <Button variant="hero" size="hero" onClick={handleCheckOutSIA}>
+        <Button variant="hero" size="hero" onClick={handleCheckOutSIA} disabled className="opacity-50 cursor-not-allowed">
           CHECK OUT S.I.A.
         </Button>
       </motion.div>
