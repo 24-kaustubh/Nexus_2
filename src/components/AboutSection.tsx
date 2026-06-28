@@ -28,7 +28,7 @@ const AboutSection = () => {
         className="max-w-5xl text-center space-y-6"
       >
         <p className="font-body text-base md:text-lg text-foreground/90 leading-relaxed">
-          Nexus is building the meeting point between people and intelligence technology that feels natural, 
+          ORVENTHICA is building the meeting point between people and intelligence technology that feels natural, 
           human, and genuinely useful in real life. We believe AI shouldn't live only inside apps or dashboards. 
           It should understand intent, take action, and fit into your day without friction. That's why we design 
           intelligence around humans: calm, minimal, and built to help you move faster while feeling more in control.
@@ -43,7 +43,7 @@ const AboutSection = () => {
         </p>
 
         <p className="font-body text-base md:text-lg text-foreground/90 leading-relaxed font-medium">
-          Founded in 2025, Nexus exists for one simple goal: make intelligence more human, 
+          Founded in 2025, ORVENTHICA exists for one simple goal: make intelligence more human, 
           and make humans more capable.
         </p>
       </motion.div>

@@ -35,7 +35,7 @@ const ProductSection = () => {
           transition={{ duration: 0.8, delay: 0.6 }}
         >
           <p className="font-body text-lg md:text-xl text-foreground/90 leading-relaxed ">
-            SIA Device is Nexus' upcoming flagship hardware companion built to turn voice into action. 
+            SIA Device is ORVENTHICA's upcoming flagship hardware companion built to turn voice into action. 
             Beyond conversation, it's designed to operate your laptop, manage files, assist with messages 
             and emails, and keep your tasks and agenda organised. For visual requests, SIA is being built 
             to project AR/VR-style experiences bringing maps, images, and information into your space.

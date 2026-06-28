@@ -23,7 +23,7 @@ const HeroSection = () => {
         transition={{ duration: 0.8, delay: 0.2 }}
         className="font-display font-black tracking-widest uppercase text-foreground text-5xl sm:text-7xl md:text-8xl lg:text-9xl mb-8 sm:mb-12 text-center"
       >
-        NEXUS
+        ORVENTHICA
       </motion.h1>
 
       {/* Subtitle */}
