@@ -1,13 +1,17 @@
 import { motion } from "framer-motion";
-import { useNavigate } from "react-router-dom";
 import HexagonLogo from "./HexagonLogo";
 import { Button } from "./ui/button";
 
-const HeroSection = () => {
-  const navigate = useNavigate();
+const WINDOWS_DOWNLOAD_URL = "https://orventhica.com/downloads/SIA_v1.0.0.zip";
+const MAC_DOWNLOAD_URL = "https://orventhica.com/downloads/SIA_v1.0.0.dmg"; // Update when Mac build is ready
 
-  const handleCheckOutSIA = () => {
-    window.location.href = "https://siaassistant.com";
+const HeroSection = () => {
+  const handleDownloadWindows = () => {
+    window.open(WINDOWS_DOWNLOAD_URL, "_blank", "noopener,noreferrer");
+  };
+
+  const handleDownloadMac = () => {
+    window.open(MAC_DOWNLOAD_URL, "_blank", "noopener,noreferrer");
   };
 
   return (
@@ -50,16 +54,19 @@ const HeroSection = () => {
         to become a real-life companion you can rely on.
       </motion.p>
 
-      {/* CTA Button */}
+      {/* Download Buttons */}
       <motion.div
         initial={{ opacity: 0, scale: 0.9 }}
         whileInView={{ opacity: 1, scale: 1 }}
         viewport={{ once: true }}
         transition={{ duration: 0.8, delay: 0.8 }}
-        className="w-full flex justify-center"
+        className="w-full flex flex-col sm:flex-row gap-4 justify-center items-center"
       >
-        <Button variant="hero" size="hero" onClick={handleCheckOutSIA} disabled className="opacity-50 cursor-not-allowed">
-          CHECK OUT S.I.A.
+        <Button variant="hero" size="hero" onClick={handleDownloadWindows}>
+          ⊞ DOWNLOAD FOR WINDOWS
+        </Button>
+        <Button variant="hero" size="hero" onClick={handleDownloadMac}>
+          ⌘ DOWNLOAD FOR MAC
         </Button>
       </motion.div>
     </section>
