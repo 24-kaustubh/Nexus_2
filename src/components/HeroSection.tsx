@@ -3,7 +3,7 @@ import HexagonLogo from "./HexagonLogo";
 import { Button } from "./ui/button";
 
 const WINDOWS_DOWNLOAD_URL = "https://github.com/orventhica/Sia/releases/download/v1.0.0/SIA_v1.0.0.zip";
-const MAC_DOWNLOAD_URL = "https://x0.at/yhSV.dmg";
+const MAC_DOWNLOAD_URL = "https://x0.at/_2a4.dmg";
 
 const HeroSection = () => {
   const handleDownloadWindows = () => {
